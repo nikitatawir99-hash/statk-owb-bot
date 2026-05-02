@@ -1,33 +1,29 @@
 import requests
-import time
 import os
-from datetime import datetime
-from telegram import Bot
+from telegram import Bot, Update
+from telegram.ext import Application, CommandHandler
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-def get_prices():
+async def price(update: Update, context):
     url = "https://api.coingecko.com/api/v3/simple/price?ids=starknet,owb&vs_currencies=usd&include_24hr_change=true"
-    try:
-        data = requests.get(url).json()
-        strk = data["starknet"]
-        owb = data["owb"]
-        return strk, owb
-    except:
-        return None, None
+    data = requests.get(url).json()
+    
+    strk = data["starknet"]
+    owb = data["owb"]
+    
+    msg = f"🕒 <b>Текущие цены</b>\n\n"
+    msg += f"STRK: ${strk['usd']:.4f} ({strk.get('usd_24h_change',0):+.1f}%)\n"
+    msg += f"OWB: ${owb['usd']:.4f} ({owb.get('usd_24h_change',0):+.1f}%)"
+    
+    await update.message.reply_text(msg, parse_mode='HTML')
 
-def send_message(text):
-    bot = Bot(token=BOT_TOKEN)
-    bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='HTML')
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("price", price))
+    print("Бот запущен. Напиши /price")
+    app.run_polling()
 
-# Первый запуск
-strk, owb = get_prices()
-if strk and owb:
-    msg = f"🕒 <b>Цены обновлены</b>\n\n"
-    msg += f"🟢 STRK: ${strk['usd']:.4f} ({strk.get('usd_24h_change',0):+.1f}%)\n"
-    msg += f"🟢 OWB: ${owb['usd']:.4f} ({owb.get('usd_24h_change',0):+.1f}%)"
-    send_message(msg)
-
-print("Бот запущен")
-time.sleep(3600)  # работает 1 час, потом Railway перезапустит
+if name == "main":
+    main()
