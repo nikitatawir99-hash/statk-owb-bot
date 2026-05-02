@@ -1,71 +1,33 @@
 import requests
 import time
-import schedule
 import os
 from datetime import datetime
 from telegram import Bot
-import asyncio
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-COINS = {
-    "starknet": "STRK",
-    "owb": "OWB"
-}
-
-THRESHOLD = 8.0
-
-async def send_message(text):
-    bot = Bot(token=BOT_TOKEN)
-    await bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='HTML')
-
 def get_prices():
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        "ids": "starknet,owb",
-        "vs_currencies": "usd",
-        "include_24hr_change": "true"
-    }
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=starknet,owb&vs_currencies=usd&include_24hr_change=true"
     try:
-        r = requests.get(url, params=params, timeout=10)
-        data = r.json()
-        return {
-            "STRK": {"price": data["starknet"]["usd"], "change": data["starknet"].get("usd_24h_change", 0)},
-            "OWB": {"price": data["owb"]["usd"], "change": data["owb"].get("usd_24h_change", 0)}
-        }
+        data = requests.get(url).json()
+        strk = data["starknet"]
+        owb = data["owb"]
+        return strk, owb
     except:
-        return None
+        return None, None
 
-def job():
-    prices = get_prices()
-    if not prices:
-        return
+def send_message(text):
+    bot = Bot(token=BOT_TOKEN)
+    bot.send_message(chat_id=CHAT_ID, text=text, parse_mode='HTML')
 
-    now = datetime.now().strftime("%H:%M")
-    msg = f"🕒 <b>Цены на {now} (Киев)</b>\n\n"
-    
-    for symbol, p in prices.items():
-        emoji = "🟢" if p["change"] >= 0 else "🔴"
-        msg += f"{emoji} <b>{symbol}</b>: ${p['price']:.4f} ({p['change']:+.1f}%)\n"
+# Первый запуск
+strk, owb = get_prices()
+if strk and owb:
+    msg = f"🕒 <b>Цены обновлены</b>\n\n"
+    msg += f"🟢 STRK: ${strk['usd']:.4f} ({strk.get('usd_24h_change',0):+.1f}%)\n"
+    msg += f"🟢 OWB: ${owb['usd']:.4f} ({owb.get('usd_24h_change',0):+.1f}%)"
+    send_message(msg)
 
-    # Алерт при сильном движении
-    alert = ""
-    for symbol, p in prices.items():
-        if abs(p["change"]) >= THRESHOLD:
-            dir_text = "🚀 ВЗЛЁТ" if p["change"] > 0 else "📉 ОБВАЛ"
-            alert += f"\n\n⚠️ <b>{dir_text} {symbol}!</b> {p['change']:+.1f}% за 24ч"
-
-    if alert:
-        msg += alert
-
-    asyncio.run(send_message(msg))
-
-if name == "main":
-    print("Бот запущен...")
-    schedule.every(6).hours.do(job)
-    job()  # первый запуск сразу
-
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+print("Бот запущен")
+time.sleep(3600)  # работает 1 час, потом Railway перезапустит
