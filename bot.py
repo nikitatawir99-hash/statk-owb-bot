@@ -1,29 +1,30 @@
 import requests
 import os
-from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler
+import time
+from telegram import Bot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-async def price(update: Update, context):
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=starknet,owb&vs_currencies=usd&include_24hr_change=true"
-    data = requests.get(url).json()
-    
-    strk = data["starknet"]
-    owb = data["owb"]
-    
-    msg = f"🕒 <b>Текущие цены</b>\n\n"
-    msg += f"STRK: ${strk['usd']:.4f} ({strk.get('usd_24h_change',0):+.1f}%)\n"
-    msg += f"OWB: ${owb['usd']:.4f} ({owb.get('usd_24h_change',0):+.1f}%)"
-    
-    await update.message.reply_text(msg, parse_mode='HTML')
+bot = Bot(token=BOT_TOKEN)
 
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("price", price))
-    print("Бот запущен. Напиши /price")
-    app.run_polling()
+def send_prices():
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=starknet,owb&vs_currencies=usd&include_24hr_change=true"
+        data = requests.get(url).json()
+        
+        strk = data["starknet"]
+        owb = data["owb"]
+        
+        msg = f"""🕒 <b>Цены STRK vs OWB</b>
 
-if name == "main":
-    main()
+STRK: ${strk['usd']:.4f} ({strk.get('usd_24h_change',0):+.1f}%)
+OWB: ${owb['usd']:.4f} ({owb.get('usd_24h_change',0):+.1f}%)"""
+        
+        bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode='HTML')
+        print("Сообщение отправлено")
+    except Exception as e:
+        print("Ошибка:", e)
+
+send_prices()   # отправить сразу
+print("Бот отработал")
